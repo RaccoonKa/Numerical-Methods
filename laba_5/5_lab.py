@@ -98,19 +98,20 @@ def adams4(f, n):
 
 
 def double_recalculation(method, f):
-    n = 10
+    n = 2
 
     while True:
-        x_prev, y_prev = method(f, n)
-        x_last, y_last = method(f, 2 * n)
+        x_prev, y_prev = method(f, n-1)
+        x_last, y_last = method(f, 2 * n-1)
         y_last_match = y_last[::2]
-
         diff = np.max(np.abs(y_prev - y_last_match))
 
         if diff < EPS:
+            print(diff)
+            print(f"n:{2*n}")
             return n, x_prev, y_prev, 2*n, x_last, y_last
 
-        n *= 2
+        n = 2*n
 
 
 def save_table(method_name, n_prev, x_prev, y_prev, n_last, x_last, y_last):
@@ -134,16 +135,15 @@ def save_table(method_name, n_prev, x_prev, y_prev, n_last, x_last, y_last):
         "y_last": y_last[-16:]
     })
 
-    df_prev = df_prev.round(8)
-    df_last = df_last.round(8)
+    df_prev = df_prev.round(4)
+    df_last = df_last.round(4)
 
-    df_prev.to_csv(RESULTS_DIR / f"{method_name}_prev.csv", index=False)
-    df_last.to_csv(RESULTS_DIR / f"{method_name}_last.csv", index=False)
+    df_prev.to_csv(RESULTS_DIR / f"{method_name}_prev.csv", index = False)
+    df_last.to_csv(RESULTS_DIR / f"{method_name}_last.csv", index = False)
 
     print("\n")
     print("Метод:", method_name)
     print("Число точек разбиения последней итерации:", n_last)
-    print("Файлы сохранены")
 
 n_prev, x_prev, y_prev, n_last, x_last, y_last = double_recalculation(euler_cauchy, f1)
 save_table("Euler_Cauchy_eq1", n_prev, x_prev, y_prev, n_last, x_last, y_last)
