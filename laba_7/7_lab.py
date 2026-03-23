@@ -1,11 +1,12 @@
 import numpy as np
 import csv
 import os
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 output_dir = 'Results_7_lab'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
-
 L = 1.0
 T_end = 1.0
 h = 0.01
@@ -43,7 +44,6 @@ for j in range(0, nt - 1):
         flux_term = (tau / (2 * h)) * (U_cons[j, i] ** 2 - U_cons[j, i - 1] ** 2)
         U_cons[j + 1, i] = U_cons[j, i] - flux_term
 
-
 def save_results(filename, data):
     file_path = os.path.join(output_dir, filename)
     with open(file_path, 'w', newline='', encoding='utf-8') as f:
@@ -56,4 +56,34 @@ def save_results(filename, data):
 save_results('viscosity_method.csv', U_visc)
 save_results('conservative_method.csv', U_cons)
 
-print(f"Результаты сохранены в папку: {os.path.abspath(output_dir)}")
+print(f"Таблицы сохранены в: {os.path.abspath(output_dir)}")
+skip = 100
+t_reduced = t[::skip]
+U_visc_reduced = U_visc[::skip, :]
+U_cons_reduced = U_cons[::skip, :]
+
+X_grid, T_grid = np.meshgrid(x, t_reduced)
+
+fig = plt.figure(figsize=(16, 7))
+
+ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+surf1 = ax1.plot_surface(X_grid, T_grid, U_visc_reduced, cmap='viridis', edgecolor='none', alpha=0.9)
+ax1.set_title('Метод искусственной вязкости')
+ax1.set_xlabel('Пространство x')
+ax1.set_ylabel('Время t')
+ax1.set_zlabel('Значение U')
+fig.colorbar(surf1, ax=ax1, shrink=0.5, aspect=10)
+ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+surf2 = ax2.plot_surface(X_grid, T_grid, U_cons_reduced, cmap='plasma', edgecolor='none', alpha=0.9)
+ax2.set_title('Консервативная схема')
+ax2.set_xlabel('Пространство x')
+ax2.set_ylabel('Время t')
+ax2.set_zlabel('Значение U')
+fig.colorbar(surf2, ax=ax2, shrink=0.5, aspect=10)
+
+plt.tight_layout()
+plot_path = os.path.join(output_dir, '3D_plots_comparison.png')
+plt.savefig(plot_path, dpi=300)
+print(f"3D графики сохранены в: {os.path.abspath(plot_path)}")
+
+plt.show()
