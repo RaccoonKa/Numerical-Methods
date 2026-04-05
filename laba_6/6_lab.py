@@ -1,123 +1,218 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import os
 
+class Solver:
+    def __init__(self, a, x_start=0, x_end=1, t_start=0, t_end=10, x_step=0.1):
+        self.a = a
+        self.x_start = x_start
+        self.x_end = x_end
+        self.t_start = t_start
+        self.t_end = t_end
+        self.x_step = x_step
 
-a_vals = [2, -2]
-dx = 0.1
-x0, x1 = 0.0, 1.0
-t0, t1 = 0.0, 10.0
-dt = 0.05
-Nt = int((t1 - t0) / dt)
+        self.t_step = 0.95 * x_step / abs(a)
+        self.lam = abs(a) * self.t_step / x_step
 
+        self.initial = lambda x: 2*x**2 - 5*x + 5
+        self.boundary_left = lambda t: t**2 - 5*t + 5
+        self.boundary_right = lambda t: t**2 - 5*t + 2
+        self.source = lambda x, t: 3*x
 
-def U0(x):
-    return 2 * x**2
+        self.nx = int((x_end - x_start) / x_step) + 1
+        self.nt = int((t_end - t_start) / self.t_step) + 1
 
+        print(f"a = {a}, шаг t = {self.t_step:.5f}, λ = {self.lam:.3f}")
 
-def f(x, t):
-    return 3 * x
+    def get_grid(self):
+        x = np.linspace(self.x_start, self.x_end, self.nx)
+        t = np.linspace(self.t_start, self.t_end, self.nt)
+        return x, t
 
+    def initialize_rectangle(self):
+        x, t = self.get_grid()
+        U = np.zeros((self.nt, self.nx))
+        U[0, :] = self.initial(x)
 
-def U_left(t):
-    return t**2
+        if self.a > 0:
+            for n in range(1, self.nt):
+                U[n, 0] = self.boundary_left(t[n])
+        else:
+            for n in range(1, self.nt):
+                U[n, -1] = self.boundary_right(t[n])
+        return x, t, U
 
+    def initialize_halfplane(self):
+        if self.a > 0:
+            x_start_ext = self.x_start - self.nt * self.x_step
+            x_end_ext = self.x_end
+        else:
+            x_start_ext = self.x_start
+            x_end_ext = self.x_end + self.nt * self.x_step
 
-def U_right(t):
-    return t**2 + 2
+        nx_ext = int((x_end_ext - x_start_ext) / self.x_step) + 1
+        x_ext = np.linspace(x_start_ext, x_end_ext, nx_ext)
+        t = np.linspace(self.t_start, self.t_end, self.nt)
 
+        U = np.zeros((self.nt, nx_ext))
+        U[0, :] = self.initial(x_ext)
 
-L_extra = 30
-output_dir = "Results_6_lab"
-os.makedirs(output_dir, exist_ok = True)
-for a in a_vals:
-    for region in ['half', 'rect']:
-        for scheme in ['explicit', 'implicit']:
-            print(f"Computing: a={a}, region={region}, scheme={scheme}")
-            if region == 'rect':
-                x = np.linspace(x0, x1, int((x1 - x0) / dx) + 1)
-                Nx = len(x)
-                idx_start = 0
-                idx_end = Nx - 1
-                if a > 0:
-                    bc_left = U_left
-                    bc_right = None
-                else:
-                    bc_left = None
-                    bc_right = U_right
+        return x_ext, t, U, nx_ext
+
+    def scheme1_upwind_left(self, rectangle=True):
+        if self.a <= 0:
+            raise ValueError("scheme1_upwind_left предназначена только для a>0")
+
+        if rectangle:
+            x, t, U = self.initialize_rectangle()
+            nx, nt = self.nx, self.nt
+        else:
+            x, t, U, nx = self.initialize_halfplane()
+            nt = self.nt
+
+        coef = self.a * self.t_step / self.x_step
+
+        for n in range(nt - 1):
+            for i in range(1, nx):
+                U[n+1, i] = U[n, i] - coef * (U[n, i] - U[n, i-1]) + self.t_step * self.source(x[i], t[n])
+
+        if rectangle:
+            return x, t, U
+        else:
+            idx_start = np.argmax(x >= 0)
+            idx_end = np.argmax(x > 1) - 1
+            if idx_end < idx_start:
+                idx_end = nx - 1
+            return x[idx_start:idx_end+1], t, U[:, idx_start:idx_end+1]
+
+    def scheme2_upwind_right(self, rectangle=True):
+        if self.a >= 0:
+            raise ValueError("scheme2_upwind_right предназначена только для a<0")
+
+        if rectangle:
+            x, t, U = self.initialize_rectangle()
+            nx, nt = self.nx, self.nt
+        else:
+            x, t, U, nx = self.initialize_halfplane()
+            nt = self.nt
+
+        coef = self.a * self.t_step / self.x_step
+
+        for n in range(nt - 1):
+            for i in range(nx - 1):
+                U[n+1, i] = U[n, i] - coef * (U[n, i+1] - U[n, i]) + self.t_step * self.source(x[i], t[n])
+
+        if rectangle:
+            return x, t, U
+        else:
+            idx_start = np.argmax(x >= 0)
+            idx_end = np.argmax(x > 1) - 1
+            if idx_end < idx_start:
+                idx_end = nx - 1
+            return x[idx_start:idx_end+1], t, U[:, idx_start:idx_end+1]
+
+    def scheme3_implicit(self):
+        if self.a <= 0:
+            raise ValueError("Неявная схема реализована только для a>0")
+        x, t, U = self.initialize_rectangle()
+        lam = self.a * self.t_step / self.x_step
+
+        for n in range(self.nt - 1):
+            U[n+1, 0] = self.boundary_left(t[n+1])
+            for i in range(1, self.nx):
+                U[n+1, i] = (U[n, i] + lam * U[n+1, i-1] + self.t_step * self.source(x[i], t[n])) / (1 + lam)
+        return x, t, U
+
+    def scheme4(self):
+        x, t, U = self.initialize_rectangle()
+        lam = self.a * self.t_step / self.x_step
+        lam2 = lam**2
+
+        for n in range(self.nt - 1):
+            for i in range(1, self.nx - 1):
+                U[n+1, i] = (U[n, i]
+                             - 0.5 * lam * (U[n, i+1] - U[n, i-1])
+                             + 0.5 * lam2 * (U[n, i+1] - 2*U[n, i] + U[n, i-1])
+                             + self.t_step * self.source(x[i], t[n]))
+            if self.a > 0:
+                U[n+1, 0] = self.boundary_left(t[n+1])
+                U[n+1, -1] = U[n, -1] - lam * (U[n, -1] - U[n, -2]) + self.t_step * self.source(x[-1], t[n])
             else:
-                if a > 0:
-                    x_min = -L_extra
-                    x_max = x1
-                else:
-                    x_min = x0
-                    x_max = x1 + L_extra
-                Nx = int(round((x_max - x_min) / dx)) + 1
-                x = np.linspace(x_min, x_max, Nx)
-                idx_start = int(round((0 - x_min) / dx))
-                idx_end = int(round((1 - x_min) / dx))
-                if a > 0:
-                    bc_left = lambda t, x0=x_min: U0(x0)
-                    bc_right = None
-                else:
-                    bc_right = lambda t, x1=x_max: U0(x1)
-                    bc_left = None
-            U_sol = np.zeros((Nt + 1, idx_end - idx_start + 1))
-            U_old = U0(x)
-            U_sol[0, :] = U_old[idx_start:idx_end + 1]
-            t_curr = t0
-            for j in range(Nt):
-                t_next = t_curr + dt
-                U_new = np.zeros(Nx)
+                U[n+1, -1] = self.boundary_right(t[n+1])
+                U[n+1, 0] = U[n, 0] - lam * (U[n, 1] - U[n, 0]) + self.t_step * self.source(x[0], t[n])
+        return x, t, U
 
-                if scheme == 'explicit':
-                    if a > 0:
-                        if bc_left is not None:
-                            U_new[0] = bc_left(t_next)
-                        for i in range(1, Nx):
-                            U_new[i] = (U_old[i]
-                                        - (a * dt / dx) * (U_old[i] - U_old[i-1])
-                                        + dt * f(x[i], t_curr))
-                    else:
-                        if bc_right is not None:
-                            U_new[Nx-1] = bc_right(t_next)
-                        for i in range(0, Nx-1):
-                            U_new[i] = (U_old[i]
-                                        - (a * dt / dx) * (U_old[i+1] - U_old[i])
-                                        + dt * f(x[i], t_curr))
+    def visualize(self, x, t, U, title, filename, region, scheme, bc_info=""):
+        X, T = np.meshgrid(x, t)
+        fig = plt.figure(figsize = (10, 8))
+        ax = fig.add_subplot(111, projection = '3d')
+        surf = ax.plot_surface(X, T, U, cmap = 'plasma', edgecolor = 'none', alpha = 0.9)
 
-                else:
-                    if a > 0:
-                        if bc_left is None:
-                            raise ValueError("Need left BC for a>0 implicit")
-                        U_new[0] = bc_left(t_next)
-                        alpha = -a * dt / dx
-                        beta = 1 + a * dt / dx
-                        rhs = U_old + dt * f(x, t_next)
-                        for i in range(1, Nx):
-                            U_new[i] = (rhs[i] - alpha * U_new[i-1]) / beta
-                    else:
-                        if bc_right is None:
-                            raise ValueError("Need right BC for a<0 implicit")
-                        U_new[Nx-1] = bc_right(t_next)
-                        beta = 1 - a * dt / dx
-                        gamma = a * dt / dx
-                        rhs = U_old + dt * f(x, t_next)
-                        for i in range(Nx-2, -1, -1):
-                            U_new[i] = (rhs[i] - gamma * U_new[i+1]) / beta
-                U_old = U_new
-                t_curr = t_next
-                U_sol[j+1, :] = U_new[idx_start:idx_end + 1]
-            X, T = np.meshgrid(x[idx_start:idx_end + 1], np.linspace(t0, t1, Nt+1))
-            fig = plt.figure(figsize = (10, 8))
-            ax = fig.add_subplot(111, projection = '3d')
-            ax.plot_surface(X, T, U_sol, cmap = 'viridis', edgecolor = 'none')
-            ax.set_xlabel('x')
-            ax.set_ylabel('t')
-            ax.set_zlabel('U')
-            ax.set_title(f'a = {a}, область = {region}, схема = {scheme}')
-            filename = f"{output_dir}/a{a}_{region}_{scheme}.png"
-            plt.savefig(filename, dpi = 150)
-            plt.close(fig)
-print("Результаты сохранены в папке Results_6_lab.")
+        ax.set_xlabel('x')
+        ax.set_ylabel('t')
+        ax.set_zlabel('U(x,t)')
+
+        full_title = f"a = {self.a}, {region}, схема {scheme}"
+        if bc_info:
+            full_title += f", {bc_info}"
+        ax.set_title(full_title)
+
+        ax.view_init(elev = 25, azim = -60)
+        plt.tight_layout()
+        plt.savefig(filename, dpi = 150)
+        print(f"Сохранен: {filename}")
+        plt.close()
+
+def main():
+    os.makedirs("Results_6_lab", exist_ok=True)
+    graph_num = 1
+
+    solver = Solver(a = 2)
+
+    x, t, U = solver.scheme1_upwind_left(rectangle = False)
+    solver.visualize(x, t, U, "", f"Results_6_lab/graph{graph_num}_half_scheme1_a2_var21.png",
+                     "полуплоскость", 1, "")
+    graph_num += 1
+
+    x, t, U = solver.scheme1_upwind_left(rectangle = True)
+    U2 = U
+    solver.visualize(x, t, U, "", f"Results_6_lab/graph{graph_num}_rect_scheme1_a2_var21.png",
+                     "прямоугольник", 1, "U(0,t)=t²-5t+5")
+    graph_num += 1
+
+    x, t, U = solver.scheme3_implicit()
+    solver.visualize(x, t, U, "", f"Results_6_lab/graph{graph_num}_rect_scheme3_a2_var21.png",
+                     "прямоугольник", 3, "U(0,t)=t²-5t+5")
+    graph_num += 1
+
+    x, t, U = solver.scheme4()
+    U4 = U
+    solver.visualize(x, t, U, "", f"Results_6_lab/graph{graph_num}_rect_scheme4_a2_var21.png",
+                     "прямоугольник", 4, "U(0,t)=t²-5t+5")
+    graph_num += 1
+
+    solver = Solver(a=-2)
+
+    x, t, U = solver.scheme2_upwind_right(rectangle = False)
+    solver.visualize(x, t, U, "", f"Results_6_lab/graph{graph_num}_half_scheme2_a-2_var21.png",
+                     "полуплоскость", 2, "")
+    graph_num += 1
+
+    x, t, U = solver.scheme2_upwind_right(rectangle = True)
+    U6 = U
+    solver.visualize(x, t, U, "", f"Results_6_lab/graph{graph_num}_rect_scheme2_a-2_var21.png",
+                     "прямоугольник", 2, "U(1,t)=t²-5t+2")
+    graph_num += 1
+
+    x, t, U = solver.scheme4()
+    U7 = U
+    solver.visualize(x, t, U, "", f"Results_6_lab/graph{graph_num}_rect_scheme4_a-2_var21.png",
+                     "прямоугольник", 4, "U(1,t)=t²-5t+2")
+
+    diff = np.max(np.abs(U2 - U4))
+    print(f"Максимальная разница 2 и 4: {diff:.2e}")
+    diff = np.max(np.abs(U6 - U7))
+    print(f"Максимальная разница 6 и 7: {diff:.2e}")
+
+if __name__ == "__main__":
+    main()

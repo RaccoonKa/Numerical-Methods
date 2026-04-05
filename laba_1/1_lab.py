@@ -5,10 +5,8 @@ from pathlib import Path
 
 WORKDIR = Path(__file__).parent
 RESULT_DIR = WORKDIR / "Results_1_lab"
-RESULT_DIR.mkdir(parents=True, exist_ok=True)
+RESULT_DIR.mkdir(parents = True, exist_ok = True)
 pd.options.display.float_format = '{:.8f}'.format
-
-# ---------- ФУНКЦИЯ ----------
 FUNCTION = 'exp(1-x) + x^2 - 5'
 
 
@@ -42,8 +40,8 @@ def create_beautiful_axes(ax, x_min, x_max, y_min, y_max):
         ax.spines['left'].set_position('zero')
 
     ax.minorticks_on()
-    ax.grid(True, which='major', linestyle='--', linewidth=0.5, alpha=0.7)
-    ax.grid(True, which='minor', linestyle=':', linewidth=0.3, alpha=0.4)
+    ax.grid(True, which = 'major', linestyle = '--', linewidth = 0.5, alpha = 0.7)
+    ax.grid(True, which = 'minor', linestyle = ':', linewidth = 0.3, alpha = 0.4)
 
     ax.set_xlabel('x', fontsize=12)
     ax.set_ylabel('f(x)', fontsize=12)
@@ -54,8 +52,8 @@ def create_beautiful_axes(ax, x_min, x_max, y_min, y_max):
 def logger(file_name, data, interval):
     pd.DataFrame({'x': data}).to_csv(
         RESULT_DIR / f"{file_name}.csv",
-        sep='\t',
-        index=False
+        sep = '\t',
+        index = False
     )
 
     return pd.DataFrame({
@@ -66,42 +64,32 @@ def logger(file_name, data, interval):
     })
 
 
-# ---------- ПАРАМЕТРЫ ----------
 a0, b0 = -2, 3
 step = 0.25
 n = 21
 eps = 1e-7
 h = 1e-1
-
 x_tab = np.linspace(a0, b0, n)
 y_tab = f(x_tab)
-
 print("Таблица значений:")
 print(pd.DataFrame({'x': x_tab, 'f(x)': y_tab}))
 
-# ---------- ПОИСК ИНТЕРВАЛОВ СМЕНЫ ЗНАКА ----------
 intervals = []
 for i in range(len(x_tab) - 1):
     if f(x_tab[i]) * f(x_tab[i + 1]) <= 0:
         intervals.append((x_tab[i], x_tab[i + 1]))
-
 print("\nИнтервалы с корнями:", intervals)
 
-# ---------- ГРАФИК ----------
 x_plot = np.linspace(a0, b0, 500)
 y_plot = f(x_plot)
-
-fig, ax = plt.subplots(figsize=(12, 8))
-
+fig, ax = plt.subplots(figsize = (12, 8))
 ax.plot(x_plot, y_plot,
-        linewidth=2.5,
-        label='f(x) = e^(1-x) + x^2 - 5',
-        alpha=0.85)
-
+        linewidth = 2.5,
+        label = 'f(x) = e^(1-x) + x^2 - 5',
+        alpha = 0.85)
 y_min, y_max = y_plot.min(), y_plot.max()
 x_margin = 0.05 * (b0 - a0)
 y_margin = 0.1 * (y_max - y_min)
-
 ax = create_beautiful_axes(
     ax,
     a0 - x_margin,
@@ -109,27 +97,23 @@ ax = create_beautiful_axes(
     y_min - y_margin,
     y_max + y_margin
 )
-
 ax.set_title(
     f'f(x) = exp(1-x) + x^2 - 5\n[{a0}, {b0}], n={n}, step={step}',
-    fontsize=15,
-    pad=15
+    fontsize = 15,
+    pad = 15
 )
 
-ax.axhline(0, linestyle='--', alpha=0.6)
+ax.axhline(0, linestyle = '--', alpha = 0.6)
 ax.legend()
-
 plt.tight_layout()
-plt.savefig(RESULT_DIR / "function_plot.png", dpi=300, bbox_inches='tight')
+plt.savefig(RESULT_DIR / "function_plot.png", dpi = 300, bbox_inches = 'tight')
 plt.close()
 
-# ---------- МЕТОДЫ ----------
 full_result = pd.DataFrame()
-
 for idx, (a, b) in enumerate(intervals, start=1):
-    print(f"\n=== Обработка корня {idx} на интервале [{a:.4f}, {b:.4f}] ===")
+    print(f"\nОбработка корня {idx} на интервале [{a:.4f}, {b:.4f}]")
 
-    # --- НЬЮТОН (касательных) ---
+    # ньютон
     x = a if f(a) * ddf(a) > 0 else b
     result = [f'{x:.8f}']
     while True:
@@ -142,7 +126,7 @@ for idx, (a, b) in enumerate(intervals, start=1):
                              logger(f'Newton_root{idx}', result, (a, b))])
     print(f"Ньютон: корень = {float(result[-1]):.8f}, итераций = {len(result)}")
 
-    # --- МЕТОД ХОРД (с фиксированным левым концом) ---
+    # метод хорд
     x = b
     result = [f'{x:.8f}']
     while True:
@@ -155,7 +139,7 @@ for idx, (a, b) in enumerate(intervals, start=1):
                              logger(f'Chords_root{idx}', result, (a, b))])
     print(f"Хорды: корень = {float(result[-1]):.8f}, итераций = {len(result)}")
 
-    # --- МЕТОД СЕКУЩИХ ---
+    # метод секущих
     x0, x1 = a, b
     result = [f'{x0:.8f}']
     while True:
@@ -168,7 +152,7 @@ for idx, (a, b) in enumerate(intervals, start=1):
                              logger(f'Secants_root{idx}', result, (a, b))])
     print(f"Секущие: корень = {float(result[-1]):.8f}, итераций = {len(result)}")
 
-    # --- КОНЕЧНО-РАЗНОСТНЫЙ НЬЮТОН ---
+    # конечно-разностный
     x = a
     result = [f'{x:.8f}']
     while True:
@@ -181,7 +165,7 @@ for idx, (a, b) in enumerate(intervals, start=1):
                              logger(f'FiniteNewton_root{idx}', result, (a, b))])
     print(f"Конечно-разностный Ньютон: корень = {float(result[-1]):.8f}, итераций = {len(result)}")
 
-    # --- МЕТОД СТЕФФЕНСЕНА ---
+    # стеффенсен
     x = (a + b) / 2
     result = [f'{x:.8f}']
     while True:
@@ -194,7 +178,7 @@ for idx, (a, b) in enumerate(intervals, start=1):
                              logger(f'Steffensen_root{idx}', result, (a, b))])
     print(f"Стеффенсен: корень = {float(result[-1]):.8f}, итераций = {len(result)}")
 
-    # --- МЕТОД РЕЛАКСАЦИИ ---
+    # релакс
     x_vals = np.linspace(a, b, 100)
     df_vals = df(x_vals)
     m = min(abs(df_vals))
@@ -232,11 +216,10 @@ for idx, (a, b) in enumerate(intervals, start=1):
                              logger(f'Relax_root{idx}', result, (a, b))])
     print(f"Релаксация: корень = {float(result[-1]):.8f}, итераций = {len(result)}, tau = {tau:.6f}")
 
-# ---------- СОХРАНЕНИЕ ----------
-full_result.to_csv(RESULT_DIR / "Results.csv", index=False)
+full_result.to_csv(RESULT_DIR / "Results.csv", index = False)
 
 print("\n" + "=" * 60)
-print("ИТОГ:")
+print("Итог:")
 print("=" * 60)
 print(full_result.to_string())
 print("\nФайлы сохранены в:", RESULT_DIR)
