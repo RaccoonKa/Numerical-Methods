@@ -16,5 +16,5 @@
 Все методы — численны на свете.  
 
 <div align="center">  
-  <img src="[https://user-images.githubusercontent.com/114250490/192084774-af22327e-799c-41e0-87bd-4df4842b6a6f.gif](https://i.pinimg.com/originals/7c/f1/0e/7cf10e493a8c42254cc894eccaf664cb.gif)" width="400" />
+  <img src="https://i.pinimg.com/originals/7c/f1/0e/7cf10e493a8c42254cc894eccaf664cb.gif" width="400" />
 </div>
