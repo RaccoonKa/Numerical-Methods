@@ -1,5 +1,5 @@
 # Numerical-Methods
-
+<div align="center">
 Численных методов властитель    
 И повелитель всех сеток —    
 Явился к нам наш вдохновитель:    
@@ -14,7 +14,7 @@
 Как в 3D, вершите судьбы, дети!»    
 Один лишь в том сомненья нет:    
 Все методы — численны на свете.  
-
+</div>
 <div align="center">  
   <img src="https://i.pinimg.com/originals/7c/f1/0e/7cf10e493a8c42254cc894eccaf664cb.gif" width="400" />
 </div>
